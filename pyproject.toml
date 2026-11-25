@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "llamamon"
+version = "1.0.0"
+description = "Live terminal monitor for a local llama-server: GPU, thermals, tokens/s and query latency"
+readme = "README.md"
+requires-python = ">=3.9"
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE"]
+authors = [{ name = "WaarlandIT", email = "info@waarland.it" }]
+keywords = ["llama.cpp", "llama-server", "tui", "monitoring", "amdgpu"]
+classifiers = [
+  "Environment :: Console",
+  "Programming Language :: Python :: 3",
+  "Topic :: System :: Monitoring",
+  "Topic :: Utilities",
+]
+dependencies = ["textual>=0.60", "httpx>=0.24"]
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[project.scripts]
+llamamon = "llamamon.tui:main"
+
+[project.urls]
+Homepage = "https://github.com/WaarlandIT/llamamon"
+Issues = "https://github.com/WaarlandIT/llamamon/issues"
+
+[tool.setuptools]
+packages = ["llamamon"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,6 +1,6 @@
 # llamamon
 
-**Version 1.1.0**
+**Version 1.2.0**
 
 A live terminal monitor for a local [`llama-server`](https://github.com/ggml-org/llama.cpp),
 built for small boxes that run the model on the GPU of the same machine: an AMD
@@ -15,6 +15,7 @@ an inference server added: tokens/s, prefill rate and query latency.
  GPU / thermal                                     llama-server
   GPU (busy% / busiest core) ██████░░░░░  62.0%     status   ● online  clients 2  slots 1
   cores   ░ 12 ▓ 71 █ 94 ░  8 ...                    model    qwen3-30b-a3b
+  compute units 40 CU  AMD BC-250 (RADV GFX1013)
   GTT (VRAM)  ████████████████░░░░░░ 11.84G / 14.60G context  98,304 tokens
   system RAM  ███████████████████░░░ 12.4G / 14.6G   server up 3h12m  RSS 1.9G
   swap        ░░░░░░░░░░░░░░░░░░░░░░  0.2G / 8.0G
@@ -29,7 +30,7 @@ an inference server added: tokens/s, prefill rate and query latency.
 
 | Panel | Contents |
 | --- | --- |
-| **GPU / thermal** | GPU busy (driver value, or the busiest CPU core when the driver has none — normal on APUs), per-core load, GTT/VARM usage, system RAM and swap, CPU and load average, edge/Tctl/TSI temperatures, fan rpm, shader clock, package power |
+| **GPU / thermal** | GPU busy (driver value, or the busiest CPU core when the driver has none — normal on APUs), per-core load, compute units from the Vulkan driver (with `LLAMAMON_CU_TOTAL` as an override), GTT/VARM usage, system RAM and swap, CPU and load average, edge/Tctl/TSI temperatures, fan rpm, shader clock, package power |
 | **llama-server** | online/offline, model, context size, server uptime and RSS, client count, the task being processed with elapsed time, instantaneous tok/s and prefill rate, prompt/cache fill, output progress |
 | **charts** | sparklines over the last 2 minutes: GPU, tok/s, RAM, CPU, temperature, power |
 | **recent queries** | the last finished queries with elapsed time, prompt, cache, output, tok/s and prefill/generation split |
@@ -73,6 +74,7 @@ llamamon --stats --since 24               # only the last 24 hours
 | `LLAMA_URL` | *(auto)* | llama-server base URL; without it llamamon uses the first of 8080/8090 that accepts a connection |
 | `LLAMAMON_INTERVAL` | `1.0` | seconds between samples |
 | `LLAMAMON_HISTORY` | `~/.llamamon-history.jsonl` | query log |
+| `LLAMAMON_CU_TOTAL` | *(detect)* | compute units to display instead of the Vulkan value; use when `vulkaninfo` is missing |
 | `LLAMAMON_SENS_CHIP` | *(any)* | chip to take the fan and board thermistors from, e.g. `nct6686` |
 | `LLAMAMON_SENS_TSI` | `AMD TSI` | label of the GPU/SoC secondary temperature |
 | `LLAMAMON_SENS_TCTL_CHIP` | *(any)* | chip to take `Tctl` from, e.g. `k10temp` |
@@ -132,6 +134,7 @@ nothing in them needs a GPU, `sensors`, or a running `llama-server`.
 
 | Version | Changes |
 | --- | --- |
+| 1.2.0 | Compute units in the GPU panel, read from `vulkaninfo`; `LLAMAMON_CU_TOTAL` override. |
 | 1.1.0 | Port detection when `LLAMA_URL` is unset; the panel shows the URL it polls. |
 | 1.0.0 | First release: GPU/thermal panel, llama-server panel with tok/s, prefill and latency, 2-minute charts, query log with `--stats`. |
 

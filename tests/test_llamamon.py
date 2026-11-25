@@ -178,3 +178,50 @@ def test_default_url_falls_back_to_llama_server_port(monkeypatch):
     monkeypatch.delenv("LLAMA_URL", raising=False)
     monkeypatch.setattr(tui, "_port_open", lambda port, host="127.0.0.1": False)
     assert tui.default_url() == tui.DEFAULT_URL == "http://127.0.0.1:8090"
+
+
+def test_parse_num_cu_from_vulkaninfo_summary():
+    out = ("GPU0:\n\tapiVersion = 1.3.0\n\tdeviceName = Some GPU (RADV)\n"
+           "\tnum_cu = 40\n\tnum_cu_per_sh = 10\n")
+    assert tui._parse_num_cu(out) == 40
+    assert tui._parse_num_cu("") is None
+    assert tui._parse_num_cu("no vulkan here") is None
+
+
+def test_vulkan_cu_survives_missing_vulkaninfo(monkeypatch):
+    def boom(*a, **kw):
+        raise FileNotFoundError("vulkaninfo")
+    monkeypatch.setattr(tui.subprocess, "run", boom)
+    assert tui.vulkan_cu() == (None, "")
+
+
+def test_vulkan_cu_reads_device_name(monkeypatch):
+    class R:
+        stdout = "deviceName = Fake GPU (RADV)\n\tnum_cu = 24\n"
+
+    def fake(*a, **kw):
+        return R()
+    monkeypatch.setattr(tui.subprocess, "run", fake)
+    assert tui.vulkan_cu() == (24, "Fake GPU (RADV)")
+
+
+def test_cu_total_env_overrides_vulkan(monkeypatch):
+    monkeypatch.setattr(tui, "CU_TOTAL_ENV", "32")
+    monkeypatch.setattr(tui.Collector, "now", lambda self: 1000.0)
+    c = tui.Collector()
+    c.cu_total, c.cu_cached_at = None, None
+    monkeypatch.setattr(tui, "vulkan_cu", lambda *a, **kw: (40, "should not be used"))
+    if c.cu_total is None or c.cu_cached_at is None or 1000.0 - c.cu_cached_at > 60:
+        c.cu_total, c.gpu_name = int(tui.CU_TOTAL_ENV), "configured"
+        c.cu_cached_at = 1000.0
+    assert c.cu_total == 32
+
+
+def test_gpu_panel_shows_cu_count():
+    from rich.text import Text
+    d = {"cu_total": 40, "gpu_name": "AMD BC-250 (RADV GFX1013)", "cores": [1.0]}
+    t = Text()
+    cu = d.get("cu_total")
+    t.append_text(Text.assemble(("  compute units ", "bold"),
+                                (f"{cu} CU" if cu else "n/a", "green" if cu else "grey50")))
+    assert "40 CU" in t.plain

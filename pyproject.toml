@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "llamamon"
-version = "1.1.0"
+version = "1.2.0"
 description = "Live terminal monitor for a local llama-server: GPU, thermals, tokens/s and query latency"
 readme = "README.md"
 requires-python = ">=3.9"

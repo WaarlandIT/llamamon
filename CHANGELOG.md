@@ -2,6 +2,16 @@
 
 Versions follow [semantic versioning](https://semver.org/).
 
+## 1.2.0
+
+- The GPU panel shows the GPU's compute units (`compute units 40 CU`) together
+  with the device name. The count comes from `vulkaninfo --summary`, which
+  reports what compute drivers actually see, so a driver-side CU unlock (for
+  example re-enabling harvested CUs on an APU) is visible here at once.
+  Everything stays optional: no vulkaninfo, no CU line content (`n/a`), and
+  `LLAMAMON_CU_TOTAL` sets the number by hand when detection is impossible.
+  The value is cached for 60 s because it only changes with the driver.
+
 ## 1.1.0
 
 - The server URL is detected when `LLAMA_URL` is not set: the first of 8080 and

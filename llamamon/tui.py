@@ -95,6 +95,38 @@ def find_freq_mhz() -> float:
     return 0.0
 
 
+CU_RE = re.compile(r"\bnum_cu\s*=\s*(\d+)")
+CU_TOTAL_ENV = os.environ.get("LLAMAMON_CU_TOTAL", "")
+
+
+def _parse_num_cu(text: str):
+    """Total compute units of the first real GPU in `vulkaninfo --summary` output."""
+    m = CU_RE.search(text or "")
+    return int(m.group(1)) if m else None
+
+
+def vulkan_cu(timeout: float = 2.0):
+    """Total CUs as the Vulkan driver reports them (RADV_DEBUG=info vulkaninfo --summary).
+
+    Returns (cu_total, device_name) or (None, "") when vulkaninfo is missing or slow.
+    This counts what applications actually see, which is the number that matters
+    for compute libraries; a driver-side CU unlock shows up here immediately.
+    Read-only, no root: dmesg/sysfs CU info is restricted on many setups.
+    """
+    try:
+        env = dict(os.environ, RADV_DEBUG="info")
+        out = subprocess.run(["vulkaninfo", "--summary"], capture_output=True,
+                             text=True, timeout=timeout, env=env).stdout
+    except (OSError, subprocess.SubprocessError):
+        return None, ""
+    cu = _parse_num_cu(out)
+    name = ""
+    m = re.search(r"deviceName\s*=\s*(.+)", out)
+    if m:
+        name = m.group(1).strip()
+    return cu, name
+
+
 def read_sensors() -> dict:
     """sensors -j for temperatures amdgpu hwmon does not expose (TSI, tctl, fans)."""
     try:
@@ -297,6 +329,9 @@ class Collector:
         self.prev_pre_at = None
         self.prev_decoded = 0
         self.requests = 0
+        self.cu_total = None      # cached: the CU count only changes with the driver
+        self.cu_cached_at = None
+        self.gpu_name = ""
         self.started = time.time()
         self.last_req = None
         self.cur = None
@@ -358,6 +393,18 @@ class Collector:
         m["vddgfx"] = read_sys(f"{self.hwmon}/in0_input")
         m["power"] = (read_sys(f"{self.hwmon}/power1_input") or 0.0) / 1e6
         m["temp_edge"] = (read_sys(f"{self.hwmon}/temp1_input") or 0.0) / 1000
+
+        # --- GPU compute units (cached ~60 s; a driver change needs a reboot anyway).
+        # LLAMAMON_CU_TOTAL wins, then the Vulkan driver, then nothing (shown as n/a).
+        if self.cu_total is None or self.cu_cached_at is None or now - self.cu_cached_at > 60:
+            if CU_TOTAL_ENV.strip().isdigit():
+                self.cu_total = int(CU_TOTAL_ENV.strip())
+                self.gpu_name = self.gpu_name or "configured"
+            else:
+                self.cu_total, self.gpu_name = vulkan_cu()
+            self.cu_cached_at = now
+        m["cu_total"] = self.cu_total
+        m["gpu_name"] = self.gpu_name
 
         sens = read_sensors()
         m["temp_tsi"] = pick(sens, SENS_FAN_CHIP, SENS_TSI, r"TSI")
@@ -740,6 +787,11 @@ class GpuPanel(Panel):
                                     (gpu_txt, "")))
         t.append_text(Text.assemble(("  cores         ", "bold"),
                                     (fmt_cores(d.get("cores") or []), "grey70"), "\n"))
+        cu = d.get("cu_total")
+        t.append_text(Text.assemble(
+            ("  compute units ", "bold"),
+            (f"{cu} CU" if cu else "n/a", "green" if cu else "grey50"),
+            (f"  {d.get('gpu_name') or ''}".rstrip() + "\n", "grey50")))
         w = self.size.width - 2
         t.append_text(mem_line("  GTT (VRAM)    ", d.get('gtt_used', 0), d.get('gtt_total', 0), w))
         t.append_text(mem_line("  system RAM    ", d.get('mem_used', 0), d.get('mem_total', 0), w))

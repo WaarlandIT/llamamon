@@ -11,6 +11,7 @@ Keys: q quit | p pause | r reset history | space refresh
 import asyncio
 import collections
 import json
+import socket
 import os
 import re
 import subprocess
@@ -26,7 +27,29 @@ from textual.widgets import Footer, Header, Static
 
 from . import __version__
 
-LLAMA = os.environ.get("LLAMA_URL", "http://127.0.0.1:8080")
+DEFAULT_URL = "http://127.0.0.1:8090"   # llama-server's own default port
+
+
+def default_url() -> str:
+    """LLAMA_URL, else whatever llama-server listens on, else llama-server's default port."""
+    env = os.environ.get("LLAMA_URL")
+    if env:
+        return env.rstrip("/")
+    for port in (8080, 8090):
+        if _port_open(port):
+            return f"http://127.0.0.1:{port}"
+    return DEFAULT_URL
+
+
+def _port_open(port: int, host: str = "127.0.0.1") -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=0.15):
+            return True
+    except OSError:
+        return False
+
+
+LLAMA = default_url()
 INTERVAL = float(os.environ.get("LLAMAMON_INTERVAL", "1.0"))
 HIST = 120  # samples kept for the charts
 MAX_HISTORY_LINES = 20000  # queries kept in the JSONL log
@@ -223,7 +246,7 @@ def find_pid_by_prompt(now: float):
 find_pid_by_prompt.last = 0.0
 find_pid_by_prompt.pid = None
 find_pid_by_prompt.started = None
-find_pid_by_prompt.port = int(LLAMA.rstrip("/").rsplit(":", 1)[-1] or 8080)
+find_pid_by_prompt.port = int(default_url().rstrip("/").rsplit(":", 1)[-1])
 
 
 def proc_ppid(pid: int) -> int:
@@ -260,12 +283,12 @@ def clients_on_port(port: int) -> int:
 class Collector:
     """One cycle: all hardware readings plus the derived values from /slots."""
 
-    def __init__(self, url: str = LLAMA, interval: float = INTERVAL):
+    def __init__(self, url: str = None, interval: float = INTERVAL):
         self.hwmon = find_hwmon()
-        self.url = url
+        self.url = (url or default_url()).rstrip("/")
         self.interval = interval
-        self.port = int(url.rsplit(":", 1)[1].rstrip("/"))
-        self.client = httpx.AsyncClient(base_url=url, timeout=2.0)
+        self.port = int(self.url.rsplit(":", 1)[1])
+        self.client = httpx.AsyncClient(base_url=self.url, timeout=2.0)
         self.prev_task = None
         self.prev_at = None
         self.prev_stat = None
@@ -292,7 +315,7 @@ class Collector:
 
     async def sample(self, now: float = None) -> dict:
         now = self.now() if now is None else now
-        m = {"ts": now}
+        m = {"ts": now, "url": self.url}
 
         # --- systeem
         try:
@@ -752,7 +775,7 @@ class ServerPanel(Panel):
             return Text("waiting for first sample…", style="grey50")
         t = Text()
         st = ("● online", "green") if d.get("server") else ("✖ offline", "bold red")
-        t.append_text(Text.assemble(("  status        ", "bold"), st,
+        t.append_text(Text.assemble(("  status        ", "bold"), st, (f"  {d.get('url','')}", "grey50"),
                                     (f"   clients {d.get('clients', 0)}   "
                                      f"slots {d.get('slots_total', 1)}\n", "")))
         t.append_text(Text.assemble(("  model         ", "bold"), (f"{d.get('model','?')}\n", "cyan")))
@@ -846,10 +869,10 @@ class MonitorApp(App):
         ("space", "force", "refresh"),
     ]
 
-    def __init__(self, url: str = LLAMA, interval: float = INTERVAL):
+    def __init__(self, url: str = None, interval: float = INTERVAL):
         super().__init__()
-        self.url, self.interval = url, interval
         self.collector = Collector(url, interval)
+        self.url, self.interval = self.collector.url, interval
         self.history_log = HistoryFile(HISTORY)
         self.data = None
         self.paused = False

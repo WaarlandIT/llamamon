@@ -160,3 +160,21 @@ def test_sensor_lookup_without_board_specifics():
     assert tui.pick(sens, "k10temp", "Tctl", r"Tctl") == 61.5
     assert tui.pick(sens, "nct6686", "Tctl", r"Tctl") is None  # wrong chip filter
     assert tui.pick_first_fan(sens) == 1500.0  # fastest fan, any chip
+
+
+def test_default_url_env_wins(monkeypatch):
+    monkeypatch.setenv("LLAMA_URL", "http://127.0.0.1:9999/")
+    assert tui.default_url() == "http://127.0.0.1:9999"
+    assert tui.Collector().url == "http://127.0.0.1:9999"
+
+
+def test_default_url_picks_a_port_that_is_listening(monkeypatch):
+    monkeypatch.delenv("LLAMA_URL", raising=False)
+    monkeypatch.setattr(tui, "_port_open", lambda port, host="127.0.0.1": port == 8090)
+    assert tui.default_url() == "http://127.0.0.1:8090"
+
+
+def test_default_url_falls_back_to_llama_server_port(monkeypatch):
+    monkeypatch.delenv("LLAMA_URL", raising=False)
+    monkeypatch.setattr(tui, "_port_open", lambda port, host="127.0.0.1": False)
+    assert tui.default_url() == tui.DEFAULT_URL == "http://127.0.0.1:8090"

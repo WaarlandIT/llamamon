@@ -1,6 +1,6 @@
 # llamamon
 
-**Version 1.0.0**
+**Version 1.1.0**
 
 A live terminal monitor for a local [`llama-server`](https://github.com/ggml-org/llama.cpp),
 built for small boxes that run the model on the GPU of the same machine: an AMD
@@ -61,8 +61,8 @@ python3 -m venv ~/.venvs/llamamon
 ## Usage
 
 ```sh
-llamamon                                  # monitor http://127.0.0.1:8090
-llamamon --url http://127.0.0.1:8080      # another port / host
+llamamon                                  # auto-detects the port llama-server listens on
+llamamon --url http://192.0.2.10:8090     # another host or port
 llamamon --interval 0.5                   # sample twice per second
 llamamon --stats                          # summary of the query log, no UI
 llamamon --stats --since 24               # only the last 24 hours
@@ -70,7 +70,7 @@ llamamon --stats --since 24               # only the last 24 hours
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `LLAMA_URL` | `http://127.0.0.1:8080` | llama-server base URL |
+| `LLAMA_URL` | *(auto)* | llama-server base URL; without it llamamon uses the first of 8080/8090 that accepts a connection |
 | `LLAMAMON_INTERVAL` | `1.0` | seconds between samples |
 | `LLAMAMON_HISTORY` | `~/.llamamon-history.jsonl` | query log |
 | `LLAMAMON_SENS_CHIP` | *(any)* | chip to take the fan and board thermistors from, e.g. `nct6686` |
@@ -132,6 +132,7 @@ nothing in them needs a GPU, `sensors`, or a running `llama-server`.
 
 | Version | Changes |
 | --- | --- |
+| 1.1.0 | Port detection when `LLAMA_URL` is unset; the panel shows the URL it polls. |
 | 1.0.0 | First release: GPU/thermal panel, llama-server panel with tok/s, prefill and latency, 2-minute charts, query log with `--stats`. |
 
 

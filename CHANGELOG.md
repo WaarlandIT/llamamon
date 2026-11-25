@@ -2,6 +2,15 @@
 
 Versions follow [semantic versioning](https://semver.org/).
 
+## 1.1.0
+
+- The server URL is detected when `LLAMA_URL` is not set: the first of 8080 and
+  8090 that accepts a connection is used (llama-server's own default,
+  127.0.0.1:8090, if neither does). A server on a non-default port no longer
+  shows up as "offline". `--url` and `LLAMA_URL` still override it.
+- The llama-server panel shows which URL is being polled, so an "offline" panel
+  says what it tried.
+
 ## 1.0.0
 
 First release.
